@@ -1,0 +1,12 @@
+name: wav
+version: 0.1.0
+
+authors:
+  - xico <xxleite@gmail.com>
+
+description: |
+  a tiny library for reading, writing and synthesizing WAV audio files.
+
+license: MIT
+
+crystal: ">= 1.8.0"
