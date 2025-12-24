@@ -26,7 +26,7 @@ class Wav
 
     fmt, data = nil, nil
     until (fmt && data) || !(id = io.read_string(4))
-      sz    = read(io, UInt32)
+      sz    = read io, UInt32
       fmt   = io.pos if id == FMT
       data  = {sz, io.pos} if id == DATA
 
@@ -58,7 +58,7 @@ class Wav
 
   def to_mono
     return self if @channels == 1
-    mono = Array(Float64).new(@samples.size // @channels)
+    mono = Array(Float64).new @samples.size // @channels
     @samples.each_slice(@channels) { |s| mono << s.sum / @channels }
     self.class.new @rate, 1, @bits, mono
   end
@@ -84,29 +84,32 @@ class Wav
     max = @samples.max_of?(&.abs) || 0.0
     return self if max <= 0
     factor = target / max
-    @samples.map! { |s| (s * factor).clamp(-1.0, 1.0) }
+    @samples.map! { |s| (s * factor).clamp -1.0, 1.0 }
     self
   end
 
   def mix! (other : self)
     raise "format mismatch" unless @rate == other.rate && @channels == other.channels
     {@samples.size, other.samples.size}.min.times do |i|
-      @samples[i] = (@samples[i] + other.samples[i]).clamp(-1.0, 1.0)
+      @samples[i] = (@samples[i] + other.samples[i]).clamp -1.0, 1.0
     end
     self
   end
 
   def trim! (s : Float64, e : Float64)
-    start     = (s * @rate * @channels).to_i.clamp(0, @samples.size)
-    finish    = (e * @rate * @channels).to_i.clamp(start, @samples.size)
+    start     = (s * @rate * @channels).to_i.clamp 0, @samples.size
+    finish    = (e * @rate * @channels).to_i.clamp start, @samples.size
     @samples  = @samples[start...finish]
     self
   end
 
-  def fade! (dur : Float64, inn = true, outt = false)
-    len = (dur * @rate * @channels).to_i.clamp(0, @samples.size)
-    len.times { |i| @samples[i] *= i.to_f / len } if inn
-    len.times { |i| @samples[@samples.size - len + i] *= 1.0 - (i.to_f / len) } if outt
+  def fade! (dur : Float64, head = false, tail = false)
+    head = true if !head && !tail
+    len  = (dur * @rate * @channels).to_i.clamp 0, @samples.size
+
+    len.times { |i| @samples[i] *= i.to_f / len } if head
+    len.times { |i| @samples[@samples.size - len + i] *= 1.0 - (i.to_f / len) } if tail
+
     self
   end
 
@@ -133,7 +136,7 @@ class Wav
 
   def chorus! (depth = 0.002, rate = 1.5, mix = 0.5)
     delay = (depth * @rate).to_i
-    buf   = Array(Float64).new(delay * 2 + 1, 0.0)
+    buf   = Array(Float64).new delay * 2 + 1, 0.0
     w_idx = 0
 
     @samples.map! do |s|
@@ -143,36 +146,36 @@ class Wav
       val                   =   s * (1 - mix) + buf[r_idx] * mix
       w_idx                 +=  1
 
-      val.clamp(-1.0, 1.0)
+      val.clamp -1.0, 1.0
     end
     self
   end
 
   def generate! (dur : Float64, amp = 1.0, &)
     (dur * @rate).to_i.times do |i|
-      val = (yield(i.to_f64 / @rate) * amp).clamp(-1.0, 1.0)
+      val = (yield(i.to_f64 / @rate) * amp).clamp -1.0, 1.0
       @channels.times { @samples << val }
     end
     self
   end
 
-  def sine! (f, d, a=1.0)
+  def sine! (f, d, a = 1.0)
     generate!(d, a) { |t| Math.sin(2 * Math::PI * f * t) }
   end
 
-  def square! (f, d, a=1.0)
+  def square! (f, d, a = 1.0)
     generate!(d, a) { |t| Math.sin(2 * Math::PI * f * t) >= 0 ? 1.0 : -1.0 }
   end
 
-  def sawtooth! (f, d, a=1.0)
+  def sawtooth! (f, d, a = 1.0)
     generate!(d, a) { |t| 2.0 * (t * f - (t * f).floor) - 1.0 }
   end
 
-  def triangle! (f, d, a=1.0)
+  def triangle! (f, d, a = 1.0)
     generate!(d, a) { |t| 2.0 * (2.0 * (t * f - (t * f + 0.5).floor)).abs - 1.0 }
   end
 
-  def noise! (d, a=1.0)
+  def noise! (d, a = 1.0)
     generate!(d, a) { Random.rand * 2.0 - 1.0 }
   end
 
@@ -192,23 +195,23 @@ class Wav
   end
 
   private def self.assert (io : IO, expected : String, skip = 0)
-    id = io.read_string(expected.bytesize)
+    id = io.read_string expected.bytesize
     raise "expected #{expected} got #{id}" unless id == expected
-    io.skip(skip)
+    io.skip skip
   end
 
   private def self.read (io : IO, type : T.class, skip = 0) forall T
-    val = io.read_bytes(type, LE)
-    io.skip(skip)
+    val = io.read_bytes type, LE
+    io.skip skip
     val
   end
 
   private def self.parse_samples (io, sz, ch, bits)
     cnt = sz // (bits // 8)
-    smp = Array(Float64).new(cnt.to_i)
+    smp = Array(Float64).new cnt.to_i
 
     if bits == 16
-      (cnt//ch).to_i.times do
+      (cnt // ch).to_i.times do
         ch.times { smp << io.read_bytes(Int16, LE).to_f64 / 32768.0 }
       end
     else
@@ -224,7 +227,7 @@ class Wav
     sz  = @samples.size * bps
 
     io.write        RIFF.to_slice
-    io.write_bytes  (36+sz).to_u32, LE
+    io.write_bytes  (36 + sz).to_u32, LE
     io.write        WAVE.to_slice
 
     io.write        FMT.to_slice
@@ -232,8 +235,8 @@ class Wav
     io.write_bytes  1_u16, LE
     io.write_bytes  @channels.to_u16, LE
     io.write_bytes  @rate.to_u32, LE
-    io.write_bytes  (@rate*@channels*bps).to_u32, LE
-    io.write_bytes  (@channels*bps).to_u16, LE
+    io.write_bytes  (@rate * @channels * bps).to_u32, LE
+    io.write_bytes  (@channels * bps).to_u16, LE
     io.write_bytes  @bits.to_u16, LE
 
     io.write        DATA.to_slice
@@ -244,7 +247,7 @@ class Wav
     sc, off = @bits == 8 ? {127.0, 128.0} : {32767.0, 0.0}
 
     @samples.each do |s|
-      v = (s.clamp(-1.0, 1.0)*sc + off).round
+      v = (s.clamp(-1.0, 1.0) * sc + off).round
       @bits == 16 ? io.write_bytes(v.to_i16, LE) : io.write_byte(v.to_u8)
     end
   end
