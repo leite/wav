@@ -5,6 +5,8 @@
 require "spec"
 require "../src/wav"
 
+
+# test helpers
 def subject (rate = 10.0, channels = 1, bits = 16, dur = 1.0, amp = 1.0, &)
   Wav.build(rate, channels, bits) { |w| w.generate(dur, amp) { |t| yield t } }
 end
@@ -21,6 +23,7 @@ def roundtrip (wav)
 end
 
 
+# test suite
 describe Wav do
   describe "synthesis" do
     it "generates silent audio" do
